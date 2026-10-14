@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: integration-service
+  
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+
+grpc:
+  risk-evaluation:
+    host: ${GRPC_RISK_EVALUATION_HOST:localhost}
+    port: ${GRPC_RISK_EVALUATION_PORT:9090}
+  user-management:
+    host: ${GRPC_USER_MANAGEMENT_HOST:localhost}
+    port: ${GRPC_USER_MANAGEMENT_PORT:9091}
+
+amqp:
+  notifications:
+    queue: notifications.queue
+    exchange: notifications.exchange
+    routing-key: notifications.routing.key
+    ttl: 3600000
+
+graphql:
+  servlet:
+    enabled: true
+    mapping: /graphql
+    corsEnabled: true
+    exception-handlers-enabled: true
+  
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        waitDurationInOpenState: 5s
+        failureRateThreshold: 50
+        eventConsumerBufferSize: 10
+        recordExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - io.grpc.StatusRuntimeException
+    instances:
+      grpcCircuitBreaker:
+        baseConfig: default
+        waitDurationInOpenState: 1s
+      amqpCircuitBreaker:
+        baseConfig: default
+        waitDurationInOpenState: 500ms
+
+server:
+  port: ${SERVER_PORT:8080}
+  
+logging:
+  level:
+    root: INFO
+    com.fintech.integration: DEBUG
+    org.springframework: INFO
+    io.grpc: INFO

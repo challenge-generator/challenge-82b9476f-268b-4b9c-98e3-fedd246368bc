@@ -1,0 +1,176 @@
+scalar DateTime
+scalar UUID
+
+enum RiskLevel {
+    LOW
+    MEDIUM
+    HIGH
+    CRITICAL
+}
+
+enum NotificationStatus {
+    PENDING
+    SENT
+    DELIVERED
+    READ
+    FAILED
+}
+
+enum NotificationType {
+    INFO
+    WARNING
+    ERROR
+    SUCCESS
+    ALERT
+}
+
+enum Role {
+    ADMIN
+    USER
+    AUDITOR
+    OPERATOR
+}
+
+type User {
+    id: UUID!
+    username: String!
+    email: String!
+    roles: [Role!]!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    lastLoginAt: DateTime
+    isActive: Boolean!
+    notificationPreferences: NotificationPreferences
+}
+
+type NotificationPreferences {
+    emailEnabled: Boolean!
+    pushEnabled: Boolean!
+    smsEnabled: Boolean!
+    frequency: String!
+}
+
+type Notification {
+    id: UUID!
+    userId: UUID!
+    title: String!
+    message: String!
+    type: NotificationType!
+    status: NotificationStatus!
+    metadata: [MetadataEntry!]
+    createdAt: DateTime!
+    sentAt: DateTime
+    deliveredAt: DateTime
+    readAt: DateTime
+}
+
+type MetadataEntry {
+    key: String!
+    value: String!
+}
+
+type RiskEvaluation {
+    id: UUID!
+    userId: UUID!
+    riskLevel: RiskLevel!
+    score: Int!
+    factors: [String!]!
+    evaluatedAt: DateTime!
+    expiresAt: DateTime!
+    recommendations: [String!]
+}
+
+type Query {
+    user(id: UUID!): User
+    users(limit: Int, offset: Int, activeOnly: Boolean): [User!]!
+    userByUsername(username: String!): User
+    userByEmail(email: String!): User
+    
+    notification(id: UUID!): Notification
+    notifications(userId: UUID!, status: NotificationStatus, limit: Int): [Notification!]!
+    unreadNotifications(userId: UUID!): [Notification!]!
+    
+    riskEvaluation(id: UUID!): RiskEvaluation
+    currentRiskEvaluation(userId: UUID!): RiskEvaluation
+    riskEvaluationHistory(userId: UUID!, limit: Int): [RiskEvaluation!]!
+    
+    healthCheck: HealthStatus!
+}
+
+type HealthStatus {
+    status: String!
+    timestamp: DateTime!
+    services: [ServiceHealth!]!
+}
+
+type ServiceHealth {
+    name: String!
+    status: String!
+    latencyMs: Int
+}
+
+input CreateUserInput {
+    username: String!
+    email: String!
+    password: String!
+    roles: [Role!]!
+    notificationPreferences: NotificationPreferencesInput
+}
+
+input UpdateUserInput {
+    username: String
+    email: String
+    roles: [Role!]
+    isActive: Boolean
+    notificationPreferences: NotificationPreferencesInput
+}
+
+input NotificationPreferencesInput {
+    emailEnabled: Boolean
+    pushEnabled: Boolean
+    smsEnabled: Boolean
+    frequency: String
+}
+
+input SendNotificationInput {
+    userId: UUID!
+    title: String!
+    message: String!
+    type: NotificationType!
+    metadata: [MetadataEntryInput!]
+}
+
+input MetadataEntryInput {
+    key: String!
+    value: String!
+}
+
+input UpdateNotificationStatusInput {
+    notificationId: UUID!
+    status: NotificationStatus!
+}
+
+type Mutation {
+    createUser(input: CreateUserInput!): User!
+    updateUser(id: UUID!, input: UpdateUserInput!): User!
+    deleteUser(id: UUID!): Boolean!
+    activateUser(id: UUID!): User!
+    deactivateUser(id: UUID!): User!
+    
+    sendNotification(input: SendNotificationInput!): Notification!
+    sendBulkNotifications(inputs: [SendNotificationInput!]!): [Notification!]!
+    updateNotificationStatus(input: UpdateNotificationStatusInput!): Notification!
+    markNotificationAsRead(notificationId: UUID!): Notification!
+    deleteNotification(id: UUID!): Boolean!
+    
+    evaluateRisk(userId: UUID!): RiskEvaluation!
+}
+
+type Subscription {
+    notificationReceived(userId: UUID!): Notification!
+    riskEvaluationCompleted(userId: UUID!): RiskEvaluation!
+}
+
+directive @auth(requires: [Role!]!) on FIELD_DEFINITION
+directive @trace on FIELD_DEFINITION
+directive @rateLimit(max: Int, window: String) on FIELD_DEFINITION

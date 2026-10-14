@@ -1,0 +1,159 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.fintech.integration.infrastructure.grpc.user";
+option java_outer_classname = "UserManagementProto";
+
+package com.fintech.integration.user;
+
+message UserManagementRequest {
+    string user_id = 1;
+    string email = 2;
+    string name = 3;
+    repeated string roles = 4;
+    bool active = 5;
+    map<string, string> metadata = 6;
+}
+
+message UserManagementResponse {
+    string user_id = 1;
+    string email = 2;
+    string name = 3;
+    repeated string roles = 4;
+    bool active = 5;
+    map<string, string> metadata = 6;
+    int64 created_at = 7;
+    int64 updated_at = 8;
+}
+
+message UserCreateRequest {
+    string email = 1;
+    string name = 2;
+    string password = 3;
+    repeated string initial_roles = 4;
+    map<string, string> attributes = 5;
+}
+
+message UserUpdateRequest {
+    string user_id = 1;
+    string email = 2;
+    string name = 3;
+    repeated string roles_to_add = 4;
+    repeated string roles_to_remove = 5;
+    bool active = 6;
+    map<string, string> metadata = 7;
+}
+
+message UserDeleteRequest {
+    string user_id = 1;
+    bool hard_delete = 2;
+    string reason = 3;
+}
+
+message UserListRequest {
+    int32 page_size = 1;
+    string page_token = 2;
+    string filter = 3;
+    string order_by = 4;
+    bool ascending = 5;
+}
+
+message UserListResponse {
+    repeated UserManagementResponse users = 1;
+    string next_page_token = 2;
+    int32 total_count = 3;
+    bool has_more = 4;
+}
+
+message UserSearchRequest {
+    string query = 1;
+    repeated string search_fields = 2;
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+message UserSearchResponse {
+    repeated UserManagementResponse users = 1;
+    int32 total_results = 2;
+    double search_time_ms = 3;
+}
+
+message UserRoleChangeRequest {
+    string user_id = 1;
+    string role = 2;
+    string action = 3;
+    string requested_by = 4;
+}
+
+message UserRoleChangeResponse {
+    string user_id = 1;
+    string role = 2;
+    bool success = 3;
+    string message = 4;
+}
+
+message UserStreamRequest {
+    string user_id = 1;
+    string stream_id = 2;
+    bool include_metadata = 3;
+}
+
+message UserStreamResponse {
+    UserManagementResponse user = 1;
+    string change_type = 2;
+    int64 sequence_number = 3;
+    bool is_final = 4;
+}
+
+service UserManagementService {
+    rpc GetUser(UserManagementRequest) returns (UserManagementResponse);
+    
+    rpc CreateUser(UserCreateRequest) returns (UserManagementResponse);
+    
+    rpc UpdateUser(UserUpdateRequest) returns (UserManagementResponse);
+    
+    rpc DeleteUser(UserDeleteRequest) returns (UserManagementResponse);
+    
+    rpc ListUsers(UserListRequest) returns (UserListResponse);
+    
+    rpc SearchUsers(UserSearchRequest) returns (UserSearchResponse);
+    
+    rpc UpdateUserRoles(UserRoleChangeRequest) returns (UserRoleChangeResponse);
+    
+    rpc StreamUserUpdates(UserStreamRequest) returns (stream UserStreamResponse);
+    
+    rpc StreamUserUpdatesBidirectional(stream UserStreamRequest) returns (stream UserStreamResponse);
+    
+    rpc HealthCheck(UserManagementRequest) returns (UserManagementResponse);
+}
+
+message UserManagementEvent {
+    string event_id = 1;
+    string event_type = 2;
+    string user_id = 3;
+    UserManagementResponse user = 4;
+    string performed_by = 5;
+    int64 occurred_at = 6;
+}
+
+message UserEventSubscriptionRequest {
+    string subscription_id = 1;
+    repeated string event_types = 2;
+    string user_id_filter = 3;
+}
+
+message UserEventAcknowledgement {
+    string event_id = 1;
+    string subscription_id = 2;
+    bool acknowledged = 3;
+}
+
+service UserManagementEventService {
+    rpc Subscribe(UserEventSubscriptionRequest) returns (stream UserManagementEvent);
+    
+    rpc SubscribeBidirectional(stream UserEventSubscriptionRequest) returns (stream UserManagementEvent);
+    
+    rpc AcknowledgeEvent(UserEventAcknowledgement) returns (UserManagementEvent);
+    
+    rpc AcknowledgeBatch(stream UserEventAcknowledgement) returns (stream UserManagementEvent);
+}

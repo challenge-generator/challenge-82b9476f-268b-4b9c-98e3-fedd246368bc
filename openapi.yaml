@@ -1,0 +1,373 @@
+openapi: 3.1.0
+info:
+  title: Fintech Integration API
+  description: API REST para el microservicio de integración con soporte para evaluación de riesgos y gestión de notificaciones
+  version: 1.0.0
+  contact:
+    name: Fintech Team
+    email: integration@fintech.com
+
+servers:
+  - url: http://localhost:8080
+    description: Servidor local de desarrollo
+  - url: https://api.fintech.com/v1
+    description: Servidor de producción
+
+tags:
+  - name: Risk Evaluation
+    description: Endpoints para evaluación de riesgos del sistema
+  - name: Health
+    description: Verificación de estado del servicio
+
+paths:
+  /api/v1/risk-evaluation:
+    post:
+      tags:
+        - Risk Evaluation
+      summary: Evaluar riesgo de una operación financiera
+      description: |
+        Envía una solicitud de evaluación de riesgo al servicio de evaluación de riesgos.
+        Utiliza gRPC internamente para la comunicación con el servicio de riesgo.
+      operationId: evaluateRisk
+      requestBody:
+        description: Datos de la operación financiera a evaluar
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiskEvaluationRequest'
+      responses:
+        '200':
+          description: Evaluación de riesgo completada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskEvaluationResponse'
+        '400':
+          description: Solicitud inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Servicio de evaluación de riesgos no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/risk-evaluation/{correlationId}:
+    get:
+      tags:
+        - Risk Evaluation
+      summary: Consultar estado de una evaluación de riesgo
+      description: |
+        Recupera el estado de una evaluación de riesgo previamente enviada
+        usando el correlationId proporcionado en la solicitud original.
+      operationId: getRiskEvaluationStatus
+      parameters:
+        - name: correlationId
+          in: path
+          description: Identificador de correlación de la solicitud original
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Estado de la evaluación recuperado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskEvaluationStatusResponse'
+        '404':
+          description: Evaluación no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/notifications:
+    post:
+      tags:
+        - Notifications
+      summary: Enviar notificación asíncrona
+      description: |
+        Envía una notificación a través de AMQP para procesamiento asíncrono.
+        La notificación se encola y se procesa de forma asíncrona.
+      operationId: sendNotification
+      requestBody:
+        description: Datos de la notificación a enviar
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+      responses:
+        '202':
+          description: Notificación aceptada para procesamiento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        '400':
+          description: Solicitud inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error al encolar la notificación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /actuator/health:
+    get:
+      tags:
+        - Health
+      summary: Verificar estado del servicio
+      description: |
+        Endpoint de health check para verificación de disponibilidad del servicio.
+        Incluye el estado de las conexiones a servicios externos.
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Servicio disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Servicio no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  schemas:
+    RiskEvaluationRequest:
+      type: object
+      required:
+        - operationType
+        - amount
+        - customerId
+      properties:
+        operationType:
+          type: string
+          enum:
+            - CREDIT_REQUEST
+            - LOAN_APPROVAL
+            - INVESTMENT
+            - TRANSFER
+            - PAYMENT
+          description: Tipo de operación financiera a evaluar
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Monto de la operación
+        customerId:
+          type: string
+          description: Identificador único del cliente
+        currency:
+          type: string
+          default: USD
+          description: Código de moneda ISO 4217
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Metadatos adicionales para la evaluación
+
+    RiskEvaluationResponse:
+      type: object
+      properties:
+        correlationId:
+          type: string
+          format: uuid
+          description: Identificador de correlación de la solicitud
+        riskLevel:
+          type: string
+          enum:
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+          description: Nivel de riesgo evaluado
+        riskScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Puntuación de riesgo (0-100)
+        approved:
+          type: boolean
+          description: Indica si la operación fue aprobada
+        reasons:
+          type: array
+          items:
+            type: string
+          description: Lista de razones de la evaluación
+        evaluatedAt:
+          type: string
+          format: date-time
+          description: Timestamp de la evaluación
+
+    RiskEvaluationStatusResponse:
+      type: object
+      properties:
+        correlationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - PENDING
+            - PROCESSING
+            - COMPLETED
+            - FAILED
+        riskLevel:
+          type: string
+          enum:
+            - LOW
+            - MEDIUM
+            - HIGH
+            - CRITICAL
+        riskScore:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+
+    NotificationRequest:
+      type: object
+      required:
+        - recipient
+        - type
+        - content
+      properties:
+        recipient:
+          type: string
+          description: Destinatario de la notificación
+        type:
+          type: string
+          enum:
+            - EMAIL
+            - SMS
+            - PUSH
+            - WEBHOOK
+          description: Tipo de notificación
+        content:
+          type: string
+          description: Contenido de la notificación
+        priority:
+          type: string
+          enum:
+            - LOW
+            - NORMAL
+            - HIGH
+          default: NORMAL
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+
+    NotificationResponse:
+      type: object
+      properties:
+        notificationId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+            - QUEUED
+            - SENT
+            - FAILED
+        queuedAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Código de error interno
+        message:
+          type: string
+          description: Descripción legible del error
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+          description: Campo que generó el error
+        message:
+          type: string
+          description: Mensaje de error específico del campo
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - UP
+            - DOWN
+            - DEGRADED
+        components:
+          type: object
+          properties:
+            grpc:
+              $ref: '#/components/schemas/ComponentHealth'
+            amqp:
+              $ref: '#/components/schemas/ComponentHealth'
+            graphql:
+              $ref: '#/components/schemas/ComponentHealth'
+
+    ComponentHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - UP
+            - DOWN
+        details:
+          type: object
+          additionalProperties:
+            type: string
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []

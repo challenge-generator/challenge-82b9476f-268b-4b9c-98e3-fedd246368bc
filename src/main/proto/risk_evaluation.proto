@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "com.fintech.integration.infrastructure.grpc.risk";
+option java_outer_classname = "RiskEvaluationProto";
+
+package com.fintech.integration.risk;
+
+message RiskEvaluationRequest {
+    string evaluation_id = 1;
+    string user_id = 2;
+    string evaluation_type = 3;
+    map<string, string> metadata = 4;
+    int64 timestamp = 5;
+}
+
+message RiskEvaluationResponse {
+    string evaluation_id = 1;
+    string user_id = 2;
+    string risk_level = 3;
+    int32 score = 4;
+    repeated string factors = 5;
+    map<string, string> metadata = 6;
+    int64 timestamp = 7;
+}
+
+message RiskFactor {
+    string factor_id = 1;
+    string factor_name = 2;
+    string factor_type = 3;
+    int32 weight = 4;
+    bool is_positive = 5;
+}
+
+message RiskEvaluationStreamRequest {
+    string user_id = 1;
+    string stream_id = 2;
+    int32 max_items = 3;
+    int64 interval_ms = 4;
+}
+
+message RiskEvaluationStreamResponse {
+    string evaluation_id = 1;
+    string user_id = 2;
+    string risk_level = 3;
+    int32 score = 4;
+    repeated RiskFactor factors = 5;
+    bool is_final = 6;
+    int64 sequence_number = 7;
+}
+
+message RiskBatchRequest {
+    repeated RiskEvaluationRequest evaluations = 1;
+    string batch_id = 2;
+    string correlation_id = 3;
+}
+
+message RiskBatchResponse {
+    repeated RiskEvaluationResponse results = 1;
+    string batch_id = 2;
+    int32 success_count = 3;
+    int32 failure_count = 4;
+    repeated string errors = 5;
+}
+
+message RiskFactorsRequest {
+    string user_id = 1;
+    string evaluation_context = 2;
+    repeated string requested_factors = 3;
+}
+
+message RiskFactorsResponse {
+    string user_id = 1;
+    repeated RiskFactor factors = 2;
+    int32 total_count = 3;
+    bool is_complete = 4;
+}
+
+service RiskEvaluationService {
+    rpc EvaluateRisk(RiskEvaluationRequest) returns (RiskEvaluationResponse);
+    
+    rpc EvaluateRiskStream(RiskEvaluationStreamRequest) returns (stream RiskEvaluationStreamResponse);
+    
+    rpc EvaluateRiskBidirectional(stream RiskEvaluationRequest) returns (stream RiskEvaluationResponse);
+    
+    rpc EvaluateRiskBatch(RiskBatchRequest) returns (RiskBatchResponse);
+    
+    rpc GetRiskFactors(RiskFactorsRequest) returns (RiskFactorsResponse);
+    
+    rpc StreamRiskFactors(RiskFactorsRequest) returns (stream RiskFactorsResponse);
+    
+    rpc HealthCheck(RiskEvaluationRequest) returns (RiskEvaluationResponse);
+}
+
+message RiskEvaluationEvent {
+    string event_id = 1;
+    string event_type = 2;
+    string evaluation_id = 3;
+    string user_id = 4;
+    RiskEvaluationResponse evaluation = 5;
+    int64 occurred_at = 6;
+}
+
+message RiskEvaluationEventRequest {
+    string subscription_id = 1;
+    string user_id = 2;
+    repeated string event_types = 3;
+}
+
+service RiskEvaluationEventService {
+    rpc Subscribe(RiskEvaluationEventRequest) returns (stream RiskEvaluationEvent);
+    
+    rpc SubscribeBidirectional(stream RiskEvaluationEventRequest) returns (stream RiskEvaluationEvent);
+}
